@@ -1,0 +1,135 @@
+================================================================================
+                    AYUSH OPD INTAKE SYSTEM - QUICK SETUP GUIDE
+================================================================================
+
+PROJECT: Voice-enabled healthcare intake for Ayurvedic clinics with AI analysis
+Tech Stack: Python FastAPI backend + Next.js React frontend + SQLite database
+
+REQUIREMENTS
+- Windows 10+
+- Python 3.9+ 
+- Node.js 18+
+- FFmpeg
+- Tesseract-OCR
+
+INSTALL DEPENDENCIES
+====================
+
+1. Python 3.9+
+   https://www.python.org/downloads/
+   ✓ Check "Add Python to PATH"
+
+2. Node.js 18+ (LTS)
+   https://nodejs.org/
+
+3. FFmpeg
+   https://ffmpeg.org/download.html
+   Add to PATH or copy ffmpeg.exe to backend/
+
+4. Tesseract-OCR
+   https://github.com/UB-Mannheim/tesseract/wiki
+   Default install path: C:\Program Files\Tesseract-OCR\
+
+
+BACKEND SETUP
+=============
+
+cd backend
+
+python -m venv venv
+venv\Scripts\activate
+
+pip install -r requirements.txt
+
+Create .env file:
+  PROJECT_NAME=Ayush OPD Intake System
+  DATABASE_URL=sqlite:///./patient_cases.db
+  OLLAMA_URL=http://127.0.0.1:11434
+  OLLAMA_MODEL=llama3.2
+  TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+
+
+FRONTEND SETUP
+==============
+
+cd frontend
+
+npm install
+
+Create .env.local:
+  NEXT_PUBLIC_API_URL=http://localhost:8000
+
+
+RUN APPLICATION
+===============
+
+Option 1 - Manual (2 terminals):
+
+Terminal 1 (Backend):
+  cd backend
+  venv\Scripts\activate
+  uvicorn app.main:app --reload --port 8000
+
+Terminal 2 (Frontend):
+  cd frontend
+  npm run dev
+
+Open: http://localhost:3000
+
+
+Option 2 - Automatic:
+  .\start.ps1
+  Open: http://localhost:3000
+
+
+TEST ENDPOINTS
+==============
+
+Health Check:
+  GET http://localhost:8000
+  Response: {"status": "active", ...}
+
+Create Case:
+  POST http://localhost:8000/cases/
+  {
+    "patient_name": "John Doe",
+    "age": 35,
+    "gender": "Male",
+    "chief_complaint_raw": "Headache",
+    "duration": "3 days"
+  }
+
+List Cases:
+  GET http://localhost:8000/cases/
+
+API Docs:
+  http://localhost:8000/docs
+
+
+TROUBLESHOOTING
+===============
+
+Python not found?
+  → Reinstall Python, check "Add to PATH", restart terminal
+
+Module not found?
+  → Ensure venv activated: venv\Scripts\activate
+  → Reinstall: pip install -r requirements.txt
+
+FFmpeg not found?
+  → Download from https://ffmpeg.org/
+  → Add to PATH or copy to backend/
+
+Tesseract not found?
+  → Verify installed at C:\Program Files\Tesseract-OCR\
+  → Update TESSERACT_CMD in .env
+
+Port 8000 already in use?
+  → netstat -ano | findstr :8000
+  → taskkill /PID <PID> /F
+  → Or use different port: --port 8001
+
+Database locked?
+  → Close all Python terminals
+  → Delete backend/patient_cases.db
+  → Restart backend
