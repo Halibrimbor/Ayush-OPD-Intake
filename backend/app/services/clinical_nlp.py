@@ -20,6 +20,49 @@ class ExtractedClinicalData(BaseModel):
     summary_hindi: str = Field(default="", description="Doctor-ready summary in Hindi")
 
 
+def suggest_follow_up(question: str, answer: str) -> Optional[str]:
+    """Ask for one missing clinical detail without diagnosing or suggesting treatment."""
+    if not answer.strip() or len(answer.strip()) > 180:
+        return None
+    prompt = f"""
+You are a careful clinical intake assistant. Review this patient question and answer:
+Question: {question}
+Answer: {answer}
+Return only JSON with one key: follow_up. The value must be either an empty string or one short,
+plain-language clarification question. Ask only if a useful detail is missing (duration, severity,
+frequency, medicine name, allergy detail, or relevant procedure). Ask at most one question.
+Never diagnose, prescribe, or suggest treatment. Do not ask for information already provided.
+"""
+    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
+    try:
+        if provider == "gemini" and os.getenv("GEMINI_API_KEY") not in (None, "", "your_actual_gemini_api_key_here"):
+            from google import genai
+            from google.genai import types
+            response = genai.Client(api_key=os.environ["GEMINI_API_KEY"]).models.generate_content(
+                model="gemini-2.5-flash", contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json", max_output_tokens=100),
+            )
+            follow_up = json.loads(response.text).get("follow_up", "").strip()
+            return follow_up or None
+        base_url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+        payload = json.dumps({"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt, "format": "json", "stream": False, "options": {"temperature": 0.1}}).encode("utf-8")
+        request = Request(f"{base_url}/api/generate", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        with urlopen(request, timeout=float(os.getenv("OLLAMA_TIMEOUT", "30"))) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        follow_up = json.loads(result["response"]).get("follow_up", "").strip()
+        return follow_up or None
+    except Exception as error:
+        print(f"Follow-up generation unavailable: {error}")
+        answer_lower = answer.lower()
+        if "allerg" in question.lower() and "no" not in answer_lower:
+            return "Which medicine, food, or substance caused the allergy, and what reaction did you notice?"
+        if "medication" in question.lower() and len(answer.split()) < 4:
+            return "Please share the medicine name and how often you take it, if you remember."
+        if len(answer.split()) < 3:
+            return "Could you tell us a little more about when this started or how often it happens?"
+        return None
+
+
 def extract_with_ollama(raw_transcript: str) -> Optional[ExtractedClinicalData]:
     base_url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "llama3.2")
@@ -88,7 +131,8 @@ Extract and structure the data into JSON matching these exact keys:
 - summary_english: a concise, factual summary including relevant report findings.
 - summary_hindi: the same summary in simple Hindi using Devanagari.
 
-Use only reported information. Never diagnose, prescribe, or invent missing values.
+Use only reported information. Never diagnose, prescribe, or invent missing values. Medical reports
+are labeled with dates and ordered oldest to newest; summarize their findings in that same order.
 Return ONLY raw valid JSON matching every field in the response schema.
 """
         response = client.models.generate_content(

@@ -1,6 +1,8 @@
 import io
 import os
-from typing import Optional
+import re
+from datetime import date
+from typing import Any, Optional
 
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
@@ -49,14 +51,70 @@ async def extract_report_text(report: UploadFile) -> str:
     return ""
 
 
-async def extract_uploaded_reports(reports: Optional[list[UploadFile]]) -> tuple[list[str], str]:
+def _find_report_date(text: str, filename: str) -> tuple[Optional[str], str]:
+    """Find the earliest usable date, preferring dates printed in the report."""
+    candidates = re.findall(
+        r"\b(20\d{2}[-_/.]\d{1,2}[-_/.]\d{1,2}|\d{1,2}[-_/.]\d{1,2}[-_/.]20\d{2}|20\d{2})\b",
+        text,
+    )
+    source = "report"
+    if not candidates:
+        candidates = re.findall(r"(?<!\d)20\d{2}(?:[-_/.]\d{1,2})?(?!\d)", filename)
+        source = "filename"
+    if not candidates:
+        return None, "unknown"
+
+    for candidate in candidates:
+        parts = re.split(r"[-_/.]", candidate)
+        try:
+            if len(parts) == 1:
+                parsed = date(int(parts[0]), 1, 1)
+            elif len(parts) == 2 and len(parts[0]) == 4:
+                parsed = date(int(parts[0]), int(parts[1]), 1)
+            elif len(parts[0]) == 4:
+                parsed = date(int(parts[0]), int(parts[1]), int(parts[2]))
+            else:
+                parsed = date(int(parts[2]), int(parts[1]), int(parts[0]))
+            return parsed.isoformat(), source
+        except ValueError:
+            continue
+    return None, "unknown"
+
+
+async def extract_uploaded_reports(
+    reports: Optional[list[UploadFile]],
+) -> tuple[list[str], str, list[dict[str, Any]]]:
     names: list[str] = []
-    sections: list[str] = []
-    for report in reports or []:
+    report_details: list[dict[str, Any]] = []
+    for upload_index, report in enumerate(reports or []):
         if not report.filename:
             continue
         names.append(report.filename)
         text = await extract_report_text(report)
+        report_date, date_source = _find_report_date(text, report.filename)
+        report_details.append({
+            "name": report.filename,
+            "report_date": report_date,
+            "date_source": date_source,
+            "upload_index": upload_index,
+        })
         if text:
-            sections.append(f"Report: {report.filename}\n{text}")
-    return names, "\n\n".join(sections)
+            report_details[-1]["text"] = text
+
+    report_details.sort(
+        key=lambda item: (
+            item["report_date"] is None,
+            item["report_date"] or "",
+            item["upload_index"],
+        )
+    )
+    sections = [
+        f"Report date: {item['report_date'] or 'Unknown date'}\n"
+        f"Report: {item['name']}\n{item['text']}"
+        for item in report_details
+        if item.get("text")
+    ]
+    for item in report_details:
+        item.pop("text", None)
+        item.pop("upload_index", None)
+    return names, "\n\n".join(sections), report_details

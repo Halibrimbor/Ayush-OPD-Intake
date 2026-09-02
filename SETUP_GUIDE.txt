@@ -25,6 +25,7 @@ INSTALL DEPENDENCIES
 3. FFmpeg
    https://ffmpeg.org/download.html
    Add to PATH or copy ffmpeg.exe to backend/
+  Verify in PowerShell: ffmpeg -version
 
 4. Tesseract-OCR
    https://github.com/UB-Mannheim/tesseract/wiki

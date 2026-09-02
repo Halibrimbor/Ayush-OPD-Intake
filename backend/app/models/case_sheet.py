@@ -13,6 +13,7 @@ class PatientCase(Base):
     
     # Clinical History Fields
     chief_complaint_raw = Column(Text)          # Raw transcription/patient input
+    patient_answers = Column(Text, nullable=True)  # Structured question-answer pairs as JSON
     chief_complaint_structured = Column(Text)   # Standardized summary/extracted symptoms
     duration = Column(String)                   # e.g., "3 days", "2 weeks"
     past_history = Column(Text, nullable=True)  # Chronic conditions, past surgeries

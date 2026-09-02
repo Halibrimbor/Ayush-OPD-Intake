@@ -8,6 +8,7 @@ class PatientCaseBase(BaseModel):
     gender: str
     contact_number: Optional[str] = None
     chief_complaint_raw: str
+    patient_answers: Optional[str] = None
     chief_complaint_structured: Optional[str] = None
     duration: str
     past_history: Optional[str] = None
