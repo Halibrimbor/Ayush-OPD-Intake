@@ -21,10 +21,11 @@ REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__fil
 class FollowUpRequest(BaseModel):
     question: str
     answer: str
+    language: str = "English"
 
 @router.post("/follow-up")
 async def follow_up_question(request: FollowUpRequest):
-    question = await run_in_threadpool(suggest_follow_up, request.question, request.answer)
+    question = await run_in_threadpool(suggest_follow_up, request.question, request.answer, request.language)
     return {"follow_up": question}
 
 @router.post("/transcribe")

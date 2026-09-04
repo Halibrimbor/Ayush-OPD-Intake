@@ -20,16 +20,16 @@ class ExtractedClinicalData(BaseModel):
     summary_hindi: str = Field(default="", description="Doctor-ready summary in Hindi")
 
 
-def suggest_follow_up(question: str, answer: str) -> Optional[str]:
+def suggest_follow_up(question: str, answer: str, language: str = "English") -> Optional[str]:
     """Ask for one missing clinical detail without diagnosing or suggesting treatment."""
     if not answer.strip() or len(answer.strip()) > 180:
         return None
     prompt = f"""
-You are a careful clinical intake assistant. Review this patient question and answer:
+You are a careful clinical intake assistant. The patient's selected language is {language}. Review this patient question and answer:
 Question: {question}
 Answer: {answer}
 Return only JSON with one key: follow_up. The value must be either an empty string or one short,
-plain-language clarification question. Ask only if a useful detail is missing (duration, severity,
+plain-language clarification question written entirely in {language}. Ask only if a useful detail is missing (duration, severity,
 frequency, medicine name, allergy detail, or relevant procedure). Ask at most one question.
 Never diagnose, prescribe, or suggest treatment. Do not ask for information already provided.
 """
@@ -54,12 +54,13 @@ Never diagnose, prescribe, or suggest treatment. Do not ask for information alre
     except Exception as error:
         print(f"Follow-up generation unavailable: {error}")
         answer_lower = answer.lower()
+        hindi = language.lower() in {"hindi", "हिंदी"}
         if "allerg" in question.lower() and "no" not in answer_lower:
-            return "Which medicine, food, or substance caused the allergy, and what reaction did you notice?"
+            return "किस दवा, भोजन या पदार्थ से एलर्जी हुई थी और आपको क्या प्रतिक्रिया हुई?" if hindi else "Which medicine, food, or substance caused the allergy, and what reaction did you notice?"
         if "medication" in question.lower() and len(answer.split()) < 4:
-            return "Please share the medicine name and how often you take it, if you remember."
+            return "यदि याद हो, तो दवा का नाम और आप इसे कितनी बार लेते हैं, बताइए।" if hindi else "Please share the medicine name and how often you take it, if you remember."
         if len(answer.split()) < 3:
-            return "Could you tell us a little more about when this started or how often it happens?"
+            return "यह कब शुरू हुआ या कितनी बार होता है, इसके बारे में थोड़ा और बताइए।" if hindi else "Could you tell us a little more about when this started or how often it happens?"
         return None
 
 
