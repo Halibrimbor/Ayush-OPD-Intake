@@ -18,7 +18,7 @@ A full-stack healthcare application for Ayurvedic clinics with voice-enabled pat
 - FastAPI (Python web framework)
 - SQLAlchemy ORM + SQLite database
 - OpenAI Whisper (speech-to-text)
-- Ollama/Google Gemini (clinical NLP)
+- Google Gemini (clinical NLP)
 - PyPDF + Tesseract OCR (document processing)
 
 **Frontend:**
@@ -101,13 +101,7 @@ ayush-opd-intake/
    
    # Recommended cloud option: Gemini API free tier (limits apply; no hosted LLM is truly unlimited).
    # Create a key at https://aistudio.google.com/apikey and set it here.
-   LLM_PROVIDER=gemini
    GEMINI_API_KEY=your_gemini_api_key_here
-   
-   # Optional local alternative:
-   # LLM_PROVIDER=ollama
-   # OLLAMA_URL=http://127.0.0.1:11434
-   # OLLAMA_MODEL=llama3.2
    ```
 
 3. **Configure Frontend**
@@ -250,5 +244,5 @@ For issues, questions, or suggestions, please open an issue on GitHub.
 
 - OpenAI for Whisper speech recognition
 - Google for Gemini API
-- Ollama for local LLM support
+- Google Gemini for clinical analysis
 - Next.js and FastAPI communities

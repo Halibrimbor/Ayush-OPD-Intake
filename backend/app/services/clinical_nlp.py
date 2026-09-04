@@ -1,7 +1,5 @@
 import os
 import json
-from urllib.error import URLError
-from urllib.request import Request, urlopen
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -33,23 +31,17 @@ plain-language clarification question written entirely in {language}. Ask only i
 frequency, medicine name, allergy detail, or relevant procedure). Ask at most one question.
 Never diagnose, prescribe, or suggest treatment. Do not ask for information already provided.
 """
-    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
     try:
-        if provider == "gemini" and os.getenv("GEMINI_API_KEY") not in (None, "", "your_actual_gemini_api_key_here"):
-            from google import genai
-            from google.genai import types
-            response = genai.Client(api_key=os.environ["GEMINI_API_KEY"]).models.generate_content(
-                model="gemini-2.5-flash", contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json", max_output_tokens=100),
-            )
-            follow_up = json.loads(response.text).get("follow_up", "").strip()
-            return follow_up or None
-        base_url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-        payload = json.dumps({"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt, "format": "json", "stream": False, "options": {"temperature": 0.1}}).encode("utf-8")
-        request = Request(f"{base_url}/api/generate", data=payload, headers={"Content-Type": "application/json"}, method="POST")
-        with urlopen(request, timeout=float(os.getenv("OLLAMA_TIMEOUT", "30"))) as response:
-            result = json.loads(response.read().decode("utf-8"))
-        follow_up = json.loads(result["response"]).get("follow_up", "").strip()
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or api_key == "your_actual_gemini_api_key_here":
+            raise RuntimeError("GEMINI_API_KEY is not configured")
+        from google import genai
+        from google.genai import types
+        response = genai.Client(api_key=api_key).models.generate_content(
+            model="gemini-2.5-flash", contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json", max_output_tokens=100),
+        )
+        follow_up = json.loads(response.text).get("follow_up", "").strip()
         return follow_up or None
     except Exception as error:
         print(f"Follow-up generation unavailable: {error}")
@@ -61,43 +53,6 @@ Never diagnose, prescribe, or suggest treatment. Do not ask for information alre
             return "यदि याद हो, तो दवा का नाम और आप इसे कितनी बार लेते हैं, बताइए।" if hindi else "Please share the medicine name and how often you take it, if you remember."
         if len(answer.split()) < 3:
             return "यह कब शुरू हुआ या कितनी बार होता है, इसके बारे में थोड़ा और बताइए।" if hindi else "Could you tell us a little more about when this started or how often it happens?"
-        return None
-
-
-def extract_with_ollama(raw_transcript: str) -> Optional[ExtractedClinicalData]:
-    base_url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-    model = os.getenv("OLLAMA_MODEL", "llama3.2")
-    prompt = f"""
-You are a clinical intake assistant for an Ayurvedic OPD. Analyze this patient narrative:
-\"\"\"{raw_transcript}\"\"\"
-Return only valid JSON with exactly these keys: symptoms (array), duration (string),
-past_history (string), allergies (string), red_flags (array), agni_status (string),
-prakriti_indicators (string), sleep_pattern (string), diet_lifestyle_notes (string),
-    soap_summary (one concise doctor-ready sentence), summary_english (doctor-ready summary in English),
-    summary_hindi (same summary in Hindi using Devanagari). Do not diagnose or recommend treatment.
-Report uncertainty clearly and use only information from the narrative.
-"""
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "format": "json",
-        "stream": False,
-        "keep_alive": "5m",
-        "options": {"temperature": 0.1},
-    }).encode("utf-8")
-
-    try:
-        request = Request(
-            f"{base_url}/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urlopen(request, timeout=float(os.getenv("OLLAMA_TIMEOUT", "30"))) as response:
-            result = json.loads(response.read().decode("utf-8"))
-        return ExtractedClinicalData(**json.loads(result["response"]))
-    except (OSError, URLError, KeyError, json.JSONDecodeError, ValueError) as error:
-        print(f"Ollama extraction unavailable: {error}")
         return None
 
 
@@ -148,7 +103,7 @@ Return ONLY raw valid JSON matching every field in the response schema.
         data = json.loads(response.text)
         return ExtractedClinicalData(**data)
     except Exception as e:
-        print(f"LLM Extraction failed: {e}. Falling back to heuristic extraction.")
+        print(f"Gemini extraction failed: {e}. Falling back to heuristic extraction.")
         return None
 
 
@@ -156,10 +111,7 @@ def extract_clinical_entities(raw_transcript: str) -> dict:
     """
     Main extraction pipeline: Tries LLM first, falls back to rule-based heuristics.
     """
-    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
-    llm_result = extract_with_llm(raw_transcript) if provider == "gemini" else extract_with_ollama(raw_transcript)
-    if not llm_result:
-        llm_result = extract_with_ollama(raw_transcript) if provider == "gemini" else extract_with_llm(raw_transcript)
+    llm_result = extract_with_llm(raw_transcript)
     if llm_result:
         data = llm_result.model_dump()
         data["past_history"] = data["past_history"] or "None reported"
