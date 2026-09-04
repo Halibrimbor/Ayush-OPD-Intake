@@ -96,11 +96,18 @@ ayush-opd-intake/
    ```
    Create `.env` file:
    ```
-   PROJECT_NAME=Ayush OPD Intake System
-   DATABASE_URL=sqlite:///./patient_cases.db
-   OLLAMA_URL=http://127.0.0.1:11434
-   OLLAMA_MODEL=llama3.2
-   TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+   PROJECT_NAME=Ayush Clinical Intake
+   DATABASE_URL=sqlite:///./test.db
+   
+   # Recommended cloud option: Gemini API free tier (limits apply; no hosted LLM is truly unlimited).
+   # Create a key at https://aistudio.google.com/apikey and set it here.
+   LLM_PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_api_key_here
+   
+   # Optional local alternative:
+   # LLM_PROVIDER=ollama
+   # OLLAMA_URL=http://127.0.0.1:11434
+   # OLLAMA_MODEL=llama3.2
    ```
 
 3. **Configure Frontend**
